@@ -1,0 +1,360 @@
+<html>
+
+<head>
+
+</head>
+<!-- <form action="" method="get">
+    <input type="submit" name="ButtonStatus" value="status" />
+</form> -->
+
+<script src="chart.js"></script>
+<!-- <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.5.0/chart.min.js"></script> -->
+
+<body>
+
+    <h1>BMT Web comm tester</h1>
+    <p>
+    <fieldset>
+        <legend>BMTCommServer</legend>
+        <button onClick="initWebSocket();">Connect to BMTCommServer</button>
+        <button onClick="connectToDev();">Add new dev connection</button>
+        <label>IP Addr:</label>
+        <input type="text" id="IPAddrText" value="10.10.1.226" />
+        <select name="comboDevType" id="comboDevType">
+            <option value="0">Sterivap</option>
+            <option value="1">Unisteri</option>
+            <option value="2">SterivapSL</option>
+            <option value="3" selected="selected">UnisteriHP_2021</option>
+        </select>
+        <br>
+        <button onClick="stopWebSocket();">Disconnect from BMTCommServer</button>
+    </fieldset>
+    <fieldset>
+        <legend>Sterilizator</legend>
+        <label>connections</label>
+        <br>
+        <select name="comboConID" id="comboConID">
+            <!-- <option value="0">none</option> -->
+        </select>
+        <button onClick="closeConnection();">Close Connection</button>
+        <br>
+        <label>Serial number</label>
+        <br>
+        <input type="text" id="devSNText" />
+        <br>
+        <label>Charge</label>
+        <input type="text" id="devCharge" value="64" />
+        <button onClick="readProtocol();">read protocol</button>
+        <button onClick="readDevState();">read dev state</button>
+    </fieldset>
+
+    </p>
+        <div>
+            <textarea id="eventsTextArea" style="width:800px;height:500px;display:inline-block;"
+                placeholder="Qualification &#10;Education &#10;Background *"></textarea>
+            <div class="chart-container" style="width:1000px;height:500px;display:inline-block;">
+                <canvas id="canvas" class='part'></canvas>
+            </div>
+        </div>
+        
+        
+
+    <script type="text/javascript">
+
+        // messages
+        const appCmdDevConnect = 0;              // open new connection with device
+        const appCmdDevDisconnect = 1;           // close connection with device
+        const appCmdDevEvent = 2;                // events from device
+        const appCmdDevReadAuditFile = 3;        // command to read audit file protocols in xml format
+        const appCmdDevReadFileProgress = 4;     // command to reading status indicator progress in "%"
+        const appCmdDevReadProtocolFile = 5;     // command to file protocols in prt binary format
+        const appCmdDevReadProtocolFormated = 6; // command to file protocols in prt xml or json format
+        const appCmdDevState = 7;                // device state in xml or json
+        const appCmdDevAuditHistory = 8;         // read audit trail log history
+        const appCmdCount = 9;
+
+        const appCmdConnectToBMTServer = 100;    // Connect to BMTCommServer
+        const appCmdDisconnectFromBMTServer = 101;// Dissconnect from BMTCommServer
+
+        var eventsTextArea = document.getElementById("eventsTextArea");
+        function debug(message) {
+            eventsTextArea.value += message + "\n";
+            eventsTextArea.scrollTop = eventsTextArea.scrollHeight;
+        }
+
+        function addConnID(conID) {
+            if(conID){
+            var e = document.getElementById("comboConID");
+
+            // check if exists
+            for (var i = 0; i < e.length; i++) {
+                if (e.options[i].value == conID) {
+                    e.selected = true;
+                    return;
+                }
+            }
+
+            var option = document.createElement("option");
+            option.text = conID;
+            option.value = conID;
+            option.selected = true;
+            e.add(option);
+            }
+        }
+
+        function removeConnID(conID) {
+            var selectobject = document.getElementById("comboConID");
+            for (var i = 0; i < selectobject.length; i++) {
+                if (selectobject.options[i].value == conID) {
+                    selectobject.remove(i);
+                }
+            }
+        }
+
+        function removeAllConn() {
+            var selectobject = document.getElementById("comboConID");
+            selectobject.options.length = 0;
+        }
+
+        function getDevType() {
+            var e = document.getElementById("comboDevType");
+            if (e.selectedIndex != -1) {
+                var value = e.options[e.selectedIndex].value;
+                var text = e.options[e.selectedIndex].text;
+                return value;
+            }
+
+            return "";
+        }
+
+        function readServerFile(file) {
+            debug("read server file");
+        }
+
+        function initWebSocket() {
+            debug("initWebSocket");
+            sendCommand(appCmdConnectToBMTServer, "0", [""], "0");
+        }
+
+        function stopWebSocket() {
+            debug("stopWebSocket");
+            sendCommand(appCmdDisconnectFromBMTServer, "0", [""], "0");
+        }
+
+        function readDevState() {
+            debug("readDevState");
+
+            var conID = document.getElementById("comboConID").value;
+            sendCommand(appCmdDevState, conID, ["1"], conID);
+        }
+
+        function readProtocol() {
+            // read decoded protocol content
+            var charge = document.getElementById("devCharge").value;
+            debug("readProtocol " + charge);
+            var conID = document.getElementById("comboConID").value;
+
+            sendCommand(appCmdDevReadProtocolFormated, conID, [charge, "0", "", "1"], conID);
+        }
+
+        function connectToDev() {
+            debug("connectToDev");
+            var v = document.getElementById("IPAddrText");
+            sendCommand(appCmdDevConnect, v.value, [getDevType()], "0");
+        }
+
+        function closeConnection() {
+            debug("closeConnection");
+            var v = document.getElementById("comboConID");
+            sendCommand(appCmdDevDisconnect, v.value, [], "0");
+        }
+
+        function sendCommand(cmd, data, args, conID) {
+            debug("sending: cmd=" + cmd + ", data=" + data + ", arg=" + args + ", conID=" + conID);
+
+            argList = Object.values(args);
+
+            var req = "/post";
+
+            (async () => {
+                const rawResponse = await fetch(req, {
+                    method: 'POST',
+                    headers: {
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ cmd: cmd, data: data, args: args, conID, conID })
+                });
+                const content = await rawResponse.json();
+
+                if (content) {
+                    switch (content.cmd) {                        
+                        case appCmdDevConnect:
+                            addConnID(content.args[0]);
+                            break;
+                        case appCmdDevDisconnect:
+                            removeConnID(content.args[0]);
+                            break;
+                        case appCmdDevState:
+                            debug(content.data);
+                            return;
+                        case appCmdDevReadProtocolFormated:
+                            debug("Protocol charge: " + content.args[0] + '\n\n' + content.data.protocol);
+                            
+                            // project graph data
+                            if(content.data && content.data.graph){
+                                fetchGraphData(content.data, content.args[0]);
+                            }
+                            return;
+                    }
+                }
+
+                debug('response' + JSON.stringify(content));
+
+            })();
+        }
+
+        function fetchGraphData(cnt, charge) {
+            var IOMap = cnt.IOMap;
+            var newdata = cnt.graph;
+            var prgName = '';
+            if(cnt.prgName) prgName = cnt.prgName;
+
+            if (IOMap.length == 0 || newdata.length == 0) return;
+            var analogs = Object.keys(IOMap.analogs);
+            var iodata = Object.keys(newdata);
+            var labels = [];
+            var datasets = [];
+            var values = [];    // analog values datasets for each analog name from analogs
+
+            var startTime = 0;
+
+            // create labels (x-axis keys)
+            for (var r = 0; r < iodata.length; r++) {
+
+                // reduce sample rate from 1 to 4
+                if (!(r % 4)) {
+                    var item = [];
+
+                    if (r == 0) {
+                        item = newdata['d'];
+                        startTime = item.time;
+                        for (var s = 0; s < analogs.length; s++) {
+                            values.push([]); // generate empty analog values list
+                        }
+                    } else {
+                        item = newdata['d' + r];
+                    }
+
+                    var timeKey = (item.time - startTime);                    
+//                    timeKey = parseInt(timeKey/60/60) + ':' + parseInt(timeKey/60)%60 + ':' + timeKey%60;
+                    // labels.push(timeKey);    // as time format
+                    labels.push((item.time - startTime)); // as number
+
+                    const vals = item.content.split(';');
+
+                    for (var e = 0; e < vals.length; e++) {
+                        values[e].push(Number(vals[e]));
+                    }
+                }
+            }
+
+            // create datasets from labels list
+            for (var r = 0; r < analogs.length; r++) {
+                var isTemp = (analogs[r].substring(0,2)=='PT' ? true : false);
+                var color = (analogs[r].substring(0,2)=='PE' ? '#0000FF' : '#FF0000');
+                var hidden = true;
+                if( analogs[r] == 'PE1.1' || analogs[r] == 'PT1.1' || analogs[r] == 'PE3')
+                    hidden = false;
+
+                var axID;
+
+                if(isTemp){
+                    axID = 'y';
+                }else{
+                    axID = 'y1';
+                }
+
+                datasets.push({ label: analogs[r], yAxisID: axID, borderWidth: 1, borderColor: color, radius: 0, backgroundColor: color, hidden: hidden, data: values[r] }); // , backgroundColor: '#FFFFFF'
+            }
+
+            chart.config.data['labels'] = labels;       // x-axis range (0.. number of data samples)
+            chart.config.data['datasets'] = datasets;   // apply datasets to chart
+            chart.config.options.plugins.title.text = prgName + ', charge: ' + charge;
+            chart.update();
+        }
+        
+        var graphData = {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [],
+            },
+            options: {
+                    responsive: true,
+                    interaction: {
+                        mode: 'index',
+                        intersect: false,
+                    },
+                    stacked: true,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: 'charge',
+                        },
+                    },
+                    scales: {
+
+                        x: {
+                            type: 'linear',
+                            position: 'bottom',
+
+                            display: true,
+                            title: {
+                                text: 'Time [s]',
+                                display: true,
+                            }
+                        },
+                        y: {
+                            type: 'linear',
+                            display: true,
+                            position: 'left',
+                            title: {
+                                text: "Temperature [\u{000B0}C]",
+                                display: true,
+                            },
+                            ticks: {
+                                max: 150,
+                                min: 0
+                            },
+                        },
+                        y1: {
+                            type: 'linear',
+                            ticks: {
+                                max: 350,
+                                min: 0
+                            },
+                            display: true,
+                            position: 'right',
+                            
+                            title: {
+                                text: 'Pressure [kPa]',
+                                display: true,
+                            },
+                            // grid line settings
+                            grid: {
+                                drawOnChartArea: false, // only want the grid lines for one axis to show up
+                            }
+                        },
+                    }
+                },
+        }
+
+        var chart = new Chart('canvas', graphData);
+        Chart.defaults.elements.line.radius = 1;
+
+    </script>
+
+</body>
+
+</html>
