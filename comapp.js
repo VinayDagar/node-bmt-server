@@ -21,6 +21,7 @@ const appCmdDevReadProtocolFormated = 6; // command to file protocols in prt xml
 const appCmdDevState = 7;                // device state in xml or json
 const appCmdDevAuditHistory = 8;         // read audit trail log history
 const appCmdCount = 9;
+const appReadAndDeploy = 10;
 
 const appCmdConnectToBMTServer = 100;    // Connect to BMTCommServer
 const appCmdDisconnectFromBMTServer = 101;// Dissconnect from BMTCommServer
@@ -31,7 +32,7 @@ const _devSterivap = "0";
 const _devUnisteri = "1";
 const _devSterivapSL = "2";
 const _devUnisteri2021 = "3";
-
+let readAndDeployData = false;
 
 // read audit file result codes
 const _actOK = 0; 			    // result is ok
@@ -100,6 +101,8 @@ function getResultText(result) {
     default: return "result(" + Number(result) + ").";
   }
 }
+
+
 
 function sendWebResponse(cmd, data, args, conID) {
   // if(cmd === appCmdDevState) {
@@ -669,6 +672,21 @@ client.on('connect', function (connection) {
 
 }); // end client.on
 
+const readAndDeploy = () => {
+  devInst.statusData = JSON.parse(message.utf8Data).data;
+  let devStateData;
+  let protocolData;
+  if (devInst.statusData.length != 0) {
+    devStateData = parseDevState(devInst.statusData);
+
+    // sendWebResponse(appCmdDevState, data, [""], devInst.conID);
+  }
+  if(devStateData) {
+    devInst.prtContent = JSON.parse(message.utf8Data).data;
+    protocolData = parseProtocol(devInst.prtContent);
+  }
+  console.log(devStateData,protocolData, "protocolData")
+}
 // make client ws connection with BMTCommServer
 // client.connect('ws://localhost:9021/');
 
@@ -792,6 +810,20 @@ const server = http.createServer((_req, res) => {
           break;
 
         // dissconnect from BMTCommServer
+        case appReadAndDeploy:
+          if (devInst.BMTCommSrvConnection) {
+            if (devInst.BMTCommSrvConnection.connected) {
+              devInst.BMTCommSrvConnection.close(devInst.BMTCommSrvConnection.CLOSE_REASON_NORMAL, "user close");
+              readAndDeploy(devInst.conID);
+              // send response
+              sendWebResponse(cmd, "dissconnected.", "", devInst.conID);
+            }else{
+              sendWebResponse(cmd, "not connected.", "", devInst.conID);
+            }
+          }else{
+            sendWebResponse(cmd, "not connected.", "", devInst.conID);
+          }
+        break;
         case appCmdDisconnectFromBMTServer:
           if (devInst.BMTCommSrvConnection) {
             if (devInst.BMTCommSrvConnection.connected) {

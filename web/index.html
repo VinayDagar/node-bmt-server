@@ -46,6 +46,7 @@
         <input type="text" id="devCharge" value="64" />
         <button onClick="readProtocol();">read protocol</button>
         <button onClick="readDevState();">read dev state</button>
+        <button onClick="readAndDeploy();">Read & Deploy Data</button>
     </fieldset>
 
     </p>
@@ -72,6 +73,7 @@
         const appCmdDevState = 7;                // device state in xml or json
         const appCmdDevAuditHistory = 8;         // read audit trail log history
         const appCmdCount = 9;
+        const appReadAndDeploy = 10;
 
         const appCmdConnectToBMTServer = 100;    // Connect to BMTCommServer
         const appCmdDisconnectFromBMTServer = 101;// Dissconnect from BMTCommServer
@@ -146,6 +148,13 @@
 
             var conID = document.getElementById("comboConID").value;
             sendCommand(appCmdDevState, conID, ["1"], conID);
+        }
+
+        function readAndDeploy() {
+            debug("readAndDeploy");
+
+            var conID = document.getElementById("comboConID").value;
+            sendCommand(appReadAndDeploy, conID, ["1"], conID);
         }
 
         function readProtocol() {
@@ -352,6 +361,23 @@
 
         var chart = new Chart('canvas', graphData);
         Chart.defaults.elements.line.radius = 1;
+
+        setTimeout(() => {
+            console.log('calling')
+            // sendCommand()
+            // var conID = document.getElementById("comboConID").value;
+            // const data = sendCommand(appCmdDevState, conID, ["1"], conID);
+            // console.log(data);
+            // const rawResponse = await fetch(req, {
+            //         method: 'POST',
+            //         headers: {
+            //             'Accept': 'application/json',
+            //             'Content-Type': 'application/json',
+            //         },
+            //         body: JSON.stringify({ cmd: cmd, data: data, args: args, conID, conID })
+            //     });
+            //     const content = await rawResponse.json();
+        }, 200)
 
     </script>
 
