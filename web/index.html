@@ -150,11 +150,55 @@
             sendCommand(appCmdDevState, conID, ["1"], conID);
         }
 
-        function readAndDeploy() {
+        async function readAndDeploy() {
             debug("readAndDeploy");
-
+            // sendCommand(appCmdDevReadProtocolFormated, conID, [charge, "0", "", "1"], conID);
             var conID = document.getElementById("comboConID").value;
-            sendCommand(appReadAndDeploy, conID, ["1"], conID);
+
+            const commands = [
+                {
+                    cmd: appCmdDevState,
+                    data: conID,
+                    args: ['1'],
+                    conID
+                },
+                {
+                    cmd: appCmdDevReadProtocolFormated,
+                    data: conID,
+                    args: ['0', '', '1'],
+                    conID
+                },
+            ]
+
+            const devStateData = await getData(commands[0].cmd, commands[0].data, commands[0].args, commands[0].conID);
+            let protocolData;
+            commands[1].args.unshift(devStateData.data.devInfo.charge)
+            if(['0', '3'].includes(devStateData.data.progState)) {
+                protocolData = await getData(commands[1].cmd, commands[1].data, commands[1].args, commands[1].conID);
+            }
+            console.log(devStateData, "devStateData", protocolData);
+
+            await fetch('http://localhost:4000/api/v1/machine/update-machine-data', {
+                method: "POST",
+                headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ devStateData: devStateData.data, protocolData })
+            })
+        }
+
+        async function getData(cmd, data, args, conID) {
+            console.log(cmd, data, args, conID, "cmd, data, args, conID")
+            const rawResponse = await fetch('/post', {
+                method: 'POST',
+                headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ cmd, data, args, conID, conID })
+            });
+            return await rawResponse.json();
         }
 
         function readProtocol() {
@@ -183,44 +227,49 @@
 
             argList = Object.values(args);
 
-            var req = "/post";
-
-            (async () => {
-                const rawResponse = await fetch(req, {
-                    method: 'POST',
-                    headers: {
-                        'Accept': 'application/json',
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ cmd: cmd, data: data, args: args, conID, conID })
-                });
-                const content = await rawResponse.json();
-
-                if (content) {
-                    switch (content.cmd) {                        
-                        case appCmdDevConnect:
-                            addConnID(content.args[0]);
-                            break;
-                        case appCmdDevDisconnect:
-                            removeConnID(content.args[0]);
-                            break;
-                        case appCmdDevState:
-                            debug(content.data);
-                            return;
-                        case appCmdDevReadProtocolFormated:
-                            debug("Protocol charge: " + content.args[0] + '\n\n' + content.data.protocol);
-                            
-                            // project graph data
-                            if(content.data && content.data.graph){
-                                fetchGraphData(content.data, content.args[0]);
-                            }
-                            return;
+            if(cmd === appReadAndDeploy) {
+                console.log(conID, 'connectionId')
+                readAndDeploy()
+            } else {
+                var req = "/post";
+    
+                (async () => {
+                    const rawResponse = await fetch(req, {
+                        method: 'POST',
+                        headers: {
+                            'Accept': 'application/json',
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ cmd: cmd, data: data, args: args, conID, conID })
+                    });
+                    const content = await rawResponse.json();
+    
+                    if (content) {
+                        switch (content.cmd) {                        
+                            case appCmdDevConnect:
+                                addConnID(content.args[0]);
+                                break;
+                            case appCmdDevDisconnect:
+                                removeConnID(content.args[0]);
+                                break;
+                            case appCmdDevState:
+                                debug(content.data);
+                                return;
+                            case appCmdDevReadProtocolFormated:
+                                debug("Protocol charge: " + content.args[0] + '\n\n' + content.data.protocol);
+                                
+                                // project graph data
+                                if(content.data && content.data.graph){
+                                    fetchGraphData(content.data, content.args[0]);
+                                }
+                                return;
+                        }
                     }
-                }
+    
+                    debug('response' + JSON.stringify(content));
+                })();
+            }
 
-                debug('response' + JSON.stringify(content));
-
-            })();
         }
 
         function fetchGraphData(cnt, charge) {

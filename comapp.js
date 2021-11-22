@@ -810,20 +810,20 @@ const server = http.createServer((_req, res) => {
           break;
 
         // dissconnect from BMTCommServer
-        case appReadAndDeploy:
-          if (devInst.BMTCommSrvConnection) {
-            if (devInst.BMTCommSrvConnection.connected) {
-              devInst.BMTCommSrvConnection.close(devInst.BMTCommSrvConnection.CLOSE_REASON_NORMAL, "user close");
-              readAndDeploy(devInst.conID);
-              // send response
-              sendWebResponse(cmd, "dissconnected.", "", devInst.conID);
-            }else{
-              sendWebResponse(cmd, "not connected.", "", devInst.conID);
-            }
-          }else{
-            sendWebResponse(cmd, "not connected.", "", devInst.conID);
-          }
-        break;
+        // case appReadAndDeploy:
+        //   if (devInst.BMTCommSrvConnection) {
+        //     if (devInst.BMTCommSrvConnection.connected) {
+        //       devInst.BMTCommSrvConnection.close(devInst.BMTCommSrvConnection.CLOSE_REASON_NORMAL, "user close");
+        //       readAndDeploy(devInst.conID);
+        //       // send response
+        //       sendWebResponse(cmd, "dissconnected.", "", devInst.conID);
+        //     }else{
+        //       sendWebResponse(cmd, "not connected.", "", devInst.conID);
+        //     }
+        //   }else{
+        //     sendWebResponse(cmd, "not connected.", "", devInst.conID);
+        //   }
+        // break;
         case appCmdDisconnectFromBMTServer:
           if (devInst.BMTCommSrvConnection) {
             if (devInst.BMTCommSrvConnection.connected) {
