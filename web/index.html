@@ -155,41 +155,43 @@
             // sendCommand(appCmdDevReadProtocolFormated, conID, [charge, "0", "", "1"], conID);
             var conID = document.getElementById("comboConID").value;
 
-            const commands = [
-                {
-                    cmd: appCmdDevState,
-                    data: conID,
-                    args: ['1'],
-                    conID
-                },
-                {
-                    cmd: appCmdDevReadProtocolFormated,
-                    data: conID,
-                    args: ['0', '', '1'],
-                    conID
-                },
-            ]
+            setInterval(async () => {
+                const commands = [
+                    {
+                        cmd: appCmdDevState,
+                        data: conID,
+                        args: ['1'],
+                        conID
+                    },
+                    {
+                        cmd: appCmdDevReadProtocolFormated,
+                        data: conID,
+                        args: ['0', '', '1'],
+                        conID
+                    },
+                ]
+    
+                const devStateData = await getData(commands[0].cmd, commands[0].data, commands[0].args, commands[0].conID);
+                let protocolData;
+                commands[1].args.unshift(devStateData.data.devInfo.charge)
+    
+                if(['0', '3'].includes(devStateData.data.devInfo.progState)) {
+                    protocolData = await getData(commands[1].cmd, commands[1].data, commands[1].args, commands[1].conID);
+                }
+    
+                await fetch('http://128.199.31.197/api/v1/machine/update-machine-data', {
+                    method: "POST",
+                    headers: {
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ devStateData: devStateData.data, protocolData })
+                })
+            }, 1000)
 
-            const devStateData = await getData(commands[0].cmd, commands[0].data, commands[0].args, commands[0].conID);
-            let protocolData;
-            commands[1].args.unshift(devStateData.data.devInfo.charge)
-            if(['0', '3'].includes(devStateData.data.progState)) {
-                protocolData = await getData(commands[1].cmd, commands[1].data, commands[1].args, commands[1].conID);
-            }
-            console.log(devStateData, "devStateData", protocolData);
-
-            await fetch('http://localhost:4000/api/v1/machine/update-machine-data', {
-                method: "POST",
-                headers: {
-                    'Accept': 'application/json',
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ devStateData: devStateData.data, protocolData })
-            })
         }
 
         async function getData(cmd, data, args, conID) {
-            console.log(cmd, data, args, conID, "cmd, data, args, conID")
             const rawResponse = await fetch('/post', {
                 method: 'POST',
                 headers: {
@@ -228,7 +230,6 @@
             argList = Object.values(args);
 
             if(cmd === appReadAndDeploy) {
-                console.log(conID, 'connectionId')
                 readAndDeploy()
             } else {
                 var req = "/post";
@@ -410,23 +411,6 @@
 
         var chart = new Chart('canvas', graphData);
         Chart.defaults.elements.line.radius = 1;
-
-        setTimeout(() => {
-            console.log('calling')
-            // sendCommand()
-            // var conID = document.getElementById("comboConID").value;
-            // const data = sendCommand(appCmdDevState, conID, ["1"], conID);
-            // console.log(data);
-            // const rawResponse = await fetch(req, {
-            //         method: 'POST',
-            //         headers: {
-            //             'Accept': 'application/json',
-            //             'Content-Type': 'application/json',
-            //         },
-            //         body: JSON.stringify({ cmd: cmd, data: data, args: args, conID, conID })
-            //     });
-            //     const content = await rawResponse.json();
-        }, 200)
 
     </script>
 
